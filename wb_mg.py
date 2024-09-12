@@ -116,6 +116,12 @@ def check_and_sync():
 def main():
     print("启动微博同步程序...")
     check_and_sync()
+    schedule.every().hours.do(check_and_sync)
+
+    while True:
+        # 检查是否有任务需要执行
+        schedule.run_pending()
+        time.sleep(1)
 
 
 if __name__ == "__main__":
