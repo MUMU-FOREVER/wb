@@ -5,6 +5,10 @@ from collections import OrderedDict
 from datetime import datetime, timedelta
 import json
 import os
+import logging
+
+# 配置日志的基本设置
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 # 微博API配置
@@ -42,9 +46,9 @@ def get_latest_weibo():
             if data.get("data", {}).get("list"):
                 return data["data"]["list"]
     except requests.exceptions.RequestException as e:
-        print(f"Request Error: {e}")
+        logging.error(f"Request Error: {e}")
     except ValueError as e:
-        print(f"JSON Decode Error: {e}")
+        logging.error(f"JSON Decode Error: {e}")
     return None
 
 
@@ -58,13 +62,15 @@ def get_long_text(id):
             data = response.json()
             return data["data"]["longTextContent"]
     except requests.exceptions.RequestException as e:
-        print(f"Request Error: {e}")
+        logging.error(f"Request Error: {e}")
     except ValueError as e:
-        print(f"JSON Decode Error: {e}")
+        logging.error(f"JSON Decode Error: {e}")
     return None
 
 
-def send_to_dingtalk(message):
+def send_to_dingtalk(long_text, time):
+    message = f"新微博消息：\n{long_text}\n发布时间：{parse_weibo_time(time)}"
+
     headers = {"Content-Type": "application/json"}
     data = {
         "msgtype": "text",
@@ -76,7 +82,7 @@ def send_to_dingtalk(message):
         response = requests.post(DINGTALK_WEBHOOK, json=data, headers=headers)
         return response.status_code == 200
     except requests.exceptions.RequestException as e:
-        print(f"DingTalk Send Error: {e}")
+        logging.error(f"DingTalk Send Error: {e}")
         return False
 
 def get_last_processed_id():
@@ -91,30 +97,35 @@ def save_last_processed_id(id):
         json.dump({'last_id': id}, f)
 
 def check_and_sync():
-    print(f"Checking for new Weibo posts at {datetime.now()}")
+    logging.info(f"定时任务执行 {datetime.now()}")
     latest_weibo = get_latest_weibo()
     ordered_dict = OrderedDict()
     last_id = get_last_processed_id()
 
-    print('遍历wb list返回数据')
+    logging.info('遍历wb list返回数据')
+    if not latest_weibo:
+        return
     for post in latest_weibo:
         if post["id"] > last_id:
-            ordered_dict.setdefault(post.get("mblogid"), post.get("created_at"))
+            # 短消息直接发送
+            if "span" in post["text"]:
+                logging.info("long text")
+                ordered_dict.setdefault(post.get("mblogid"), post.get("created_at"))
+            else:
+                logging.info("short text")
+                send_to_dingtalk(post.get("text"), post.get("created_at"))
+    save_last_processed_id(latest_weibo[0]["id"])
+
     if not ordered_dict:
         return
-
-    print('遍历获取长消息发送钉钉')
+    logging.info('遍历获取长消息发送钉钉')
     for id, time in ordered_dict.items():
         long_text = get_long_text(id)
         # 5077764864478181
         # {'visible': {'type': 0, 'list_id': 0}, 'created_at': 'Thu Sep 12 12:55:47 +0800 2024', 'id': 5077764864478181, 'idstr': '5077764864478181', 'mid': '5077764864478181', 'mblogid': 'OwD1ciMYJ', 'user': {'id': 7896332555, 'idstr': '7896332555', 'pc_new': 0, 'screen_name': '一年能赚百倍', 'profile_image_url': 'https://tvax1.sinaimg.cn/default/images/default_avatar_male_50.gif?KID=imgbed,tva&Expires=1726136909&ssig=jeSK0RFDtI', 'profile_url': '/u/7896332555', 'verified': False, 'verified_type': -1, 'domain': '', 'weihao': '', 'status_total_counter': {'total_cnt_format': 63, 'comment_cnt': '2', 'repost_cnt': '0', 'like_cnt': '61', 'total_cnt': '63'}, 'avatar_large': 'https://tvax1.sinaimg.cn/default/images/default_avatar_male_180.gif?KID=imgbed,tva&Expires=1726136909&ssig=YC1RzGfK55', 'avatar_hd': 'https://tvax1.sinaimg.cn/default/images/default_avatar_male_180.gif?KID=imgbed,tva&Expires=1726136909&ssig=YC1RzGfK55', 'follow_me': False, 'following': True, 'mbrank': 1, 'mbtype': 11, 'v_plus': None, 'planet_video': True, 'icon_list': [{'type': 'vip', 'data': {'mbrank': 1, 'mbtype': 11, 'svip': 0, 'vvip': 0}}]}, 'can_edit': False, 'textLength': 1038, 'annotations': [{'shooting': 1, 'client_mblogid': 'd23d25cd-4d10-48f0-8267-33c84cb35405'}, {'source_text': '', 'phone_id': '-1'}, {'mapi_request': True}], 'source': '', 'favorited': False, 'rid': '0_0_50_162479832584234008_0_0_0', 'pic_ids': [], 'pic_num': 0, 'is_paid': False, 'mblog_vip_type': 0, 'number_display_strategy': {'apply_scenario_flag': 19, 'display_text_min_number': 1000000, 'display_text': '100万+'}, 'reposts_count': 0, 'comments_count': 2, 'attitudes_count': 21, 'attitudes_status': 0, 'continue_tag': {'title': '全文', 'pic': 'http://h5.sinaimg.cn/upload/2015/09/25/3/timeline_card_small_article.png', 'scheme': 'sinaweibo://detail?mblogid=5077764864478181&id=5077764864478181&next_fid=232532_mblog&feed_detail_type=0', 'cleaned': True}, 'isLongText': True, 'mlevel': 0, 'content_auth': 0, 'is_show_bulletin': 2, 'comment_manage_info': {'comment_permission_type': -1, 'approval_comment_type': 0, 'comment_sort_type': 0}, 'share_repost_type': 0, 'mblogtype': 0, 'showFeedRepost': False, 'showFeedComment': False, 'pictureViewerSign': False, 'showPictureViewer': False, 'rcList': [], 'analysis_extra': 'follow:1', 'readtimetype': 'mblog', 'mixed_count': 0, 'is_show_mixed': False, 'text': '做事情一定要按照规则、规律，这样可以做好，不能急，不要把极小概率的成功当做常态，如果这样盲目地效仿就很容易出现东施效颦的丑态，你要知道自己该干什么，你的规则怎样？你的计划怎样？你做的怎样？在你做事情之前就要了解大概，制定规则，再操作，但在操作的时候会出现一些不同的东西，这个时候你 \u200b\u200b\u200b ...<span class="expand">展开</span>', 'text_raw': '做事情一定要按照规则、规律，这样可以做好，不能急，不要把极小概率的成功当做常态，如果这样盲目地效仿就很容易出现东施效颦的丑态，你要知道自己该干什么，你的规则怎样？你的计划怎样？你做的怎样？在你做事情之前就要了解大概，制定规则，再操作，但在操作的时候会出现一些不同的东西，这个时候你 \u200b\u200b\u200b', 'region_name': '发布于 上海', 'customIcons': []}
-        message = f"新微博消息：\n{long_text}\n发布时间：{parse_weibo_time(time)}"
-        print(send_to_dingtalk(message))
-
-    save_last_processed_id(latest_weibo[0]["id"])
+        print(send_to_dingtalk(long_text, time))
 
 def main():
-    print("启动微博同步程序...")
     check_and_sync()
     schedule.every().hours.do(check_and_sync)
 

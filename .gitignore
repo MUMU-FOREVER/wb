@@ -16,3 +16,6 @@ old_code/
 Data/
 **/__pycache__/
 **/.venv/
+
+# 日志文件
+output.log
