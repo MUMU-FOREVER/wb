@@ -91,7 +91,7 @@ def check_and_sync(user):
     if not latest_weibo:
         return
     for message in latest_weibo:
-        if message["id"] > user.last_id and user.uid != str(message.get('user').get('id')):
+        if message["id"] > user.last_id and user.uid == str(message.get('user').get('id')):
             send_message(user, message)
     user.last_id=latest_weibo[0]["id"]
 
