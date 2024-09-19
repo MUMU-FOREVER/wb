@@ -19,3 +19,6 @@ Data/
 
 # 日志文件
 output.log
+
+# python版本控制
+.python-version

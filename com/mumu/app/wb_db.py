@@ -98,17 +98,9 @@ def check_and_sync(user):
 
 def check_and_sync_log():
     logging.info("============== start =================")
-    # 数据库连接信息
-    USER = 'root'
-    PASSWORD = 'root'
-    HOST = 'localhost'  # 或者你的MySQL服务器地址
-    DATABASE = 'wb'
 
     # 创建数据库连接
-    db = Database(USER, PASSWORD, HOST, DATABASE)
-
-    # 创建表
-    User.create_table(db)
+    db = Database.local_database()
 
     # 创建会话
     session = db.get_session()
