@@ -15,7 +15,7 @@ WEIBO_API_URL = "https://weibo.com/ajax/statuses/mymblog"
 WEIBO_LONG_TEXT_URL = "https://weibo.com/ajax/statuses/longtext"
 
 # 请替换以下cookie值为你自己的
-COOKIE = "XSRF-TOKEN=UmpzytSenQAbkUKSBQTn59yz; SCF=AiqQguBVNRzSu0KoVZbtHpxIUXG1WXyx4KQO7KyzlSExnkM6Fa0nQptKP0V9N_29ZdpihO_Hf7glTfdcgeGRM3E.; SUB=_2A25L5v_5DeRhGeBP6VoW9SvFzDWIHXVomn0xrDV8PUNbmtAbLVPYkW9NRXY2jZNHmvyWtC68ztXEEFuM5-H-i3ao; SUBP=0033WrSXqPxfM725Ws9jqgMF55529P9D9WhOnREGF5-ni5TiSyvnohsR5JpX5KzhUgL.FoqpeonNSK-4S0.2dJLoIEBLxK-L1K2LBKnLxKqL1-eL1-qLxKnL12BLBKeLxKnL1h5L1h5t; ALF=02_1728715946; WBPSESS=g82Sj9YE-TKAkLUPlqSBQ-g1hN0DRv66HkoL4QWDRt2UEKWEZ6aJ8YtenUCkg4gHUOlQ6gOgDNS50h67uwcEUq38I2vca61TgC38cb7OWc49-SnGRHn8Xtk2qega8OsiqNasHv2ogdjHYEx3pf1Rxg=="
+COOKIE = "UOR=www.google.com,weibo.com,www.google.com; SINAGLOBAL=1501339418390.0996.1715742721445; SCF=AlXLBiPjXZ_bBVH2QOsVabjZA2-YvdgzlxSY6FAn4Ll-psxOPeiUDTBET37LEMYxhtUPec03ga_xev-wHkuxHOQ.; ALF=1728868994; SUB=_2A25L4JXSDeRhGeBP6VoW9SvFzDWIHXVon5carDV8PUJbkNB-LU3ykW1NRXY2jUawVnjOvkTAr-dlDBXcfDbC7tR1; SUBP=0033WrSXqPxfM725Ws9jqgMF55529P9D9WhOnREGF5-ni5TiSyvnohsR5JpX5KMhUgL.FoqpeonNSK-4S0.2dJLoIEBLxK-L1K2LBKnLxKqL1-eL1-qLxKnL12BLBKeLxKnL1h5L1h5t; XSRF-TOKEN=pNwNFmjgF6mes291MF9vrcYy; _s_tentry=weibo.com; Apache=3136283746669.5415.1726649678250; ULV=1726649678263:6:4:1:3136283746669.5415.1726649678250:1726296280478; WBPSESS=g82Sj9YE-TKAkLUPlqSBQ-g1hN0DRv66HkoL4QWDRt1vXC6qKIrhyMDbivy4PiDnNoYqqE_Cea2jpb_Y0VN-1i-A2Q1ck_XwOyGDmUuJo01nyqWd1yLEDZ6iAW8oFzelCDd3rvQ3JGhHt-_cyohPpw=="
 
 HEADERS = {
     "cookie": COOKIE,
@@ -61,8 +61,8 @@ def get_long_text(id):
     return None
 
 
-def send_to_dingtalk(webhook, long_text, time):
-    message = f"发布时间：{parse_time(time)} \n{long_text}"
+def send_to_dingtalk(user, long_text, time):
+    message = f"发布人：【{user.name}】  发布时间：{parse_time(time)} \n{long_text}"
     headers = {"Content-Type": "application/json"}
     data = {
         "msgtype": "text",
@@ -71,7 +71,7 @@ def send_to_dingtalk(webhook, long_text, time):
         }
     }
     try:
-        response = requests.post(webhook, json=data, headers=headers)
+        response = requests.post(user.webhook, json=data, headers=headers)
         return response.status_code == 200
     except requests.exceptions.RequestException as e:
         logging.error(f"DingTalk Send Error: {e}")
@@ -81,9 +81,9 @@ def send_message(user, message):
     # 短消息直接发送
     if "span" in message.get('text'):
         long_text = get_long_text(message.get("mblogid"))
-        send_to_dingtalk(user.webhook, long_text, message.get("created_at"))
+        send_to_dingtalk(user, long_text, message.get("created_at"))
     else:
-        send_to_dingtalk(user.webhook, message.get("text"), message.get("created_at"))
+        send_to_dingtalk(user, message.get("text"), message.get("created_at"))
 
 def check_and_sync(user):
     latest_weibo = get_latest_weibo(user.uid)
