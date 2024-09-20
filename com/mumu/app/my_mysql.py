@@ -5,11 +5,10 @@ from sqlalchemy.orm import sessionmaker
 # 创建一个基础类
 Base = declarative_base()
 
-# 数据库连接信息
-user = 'root'
-password = 'root'
-host = 'localhost'  # 或者你的MySQL服务器地址
-database = 'wb'
+user = 'mu'
+password = 'rq1x7McuC5z8iFPt'
+host = 'mysql6.serv00.com'  # 或者你的MySQL服务器地址
+database = 'm6766_wb'
 
 class Database:
     def __init__(self, user, password, host, database):
