@@ -1,4 +1,5 @@
 import logging
+import sys
 import time
 from datetime import datetime
 import requests
@@ -13,9 +14,10 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %
 # 微博API配置
 WEIBO_API_URL = "https://weibo.com/ajax/statuses/mymblog"
 WEIBO_LONG_TEXT_URL = "https://weibo.com/ajax/statuses/longtext"
+DEFAULT_WEBHOOK = "https://oapi.dingtalk.com/robot/send?access_token=67236f678a9b4f09aceb663ddf7a2b7775c1a768b1e8c2d0c5bd5e9dcb9fcc68"
 
 # 请替换以下cookie值为你自己的
-COOKIE = "UOR=www.google.com,weibo.com,www.google.com; SINAGLOBAL=1501339418390.0996.1715742721445; SUBP=0033WrSXqPxfM725Ws9jqgMF55529P9D9WhOnREGF5-ni5TiSyvnohsR5JpX5KMhUgL.FoqpeonNSK-4S0.2dJLoIEBLxK-L1K2LBKnLxKqL1-eL1-qLxKnL12BLBKeLxKnL1h5L1h5t; XSRF-TOKEN=pNwNFmjgF6mes291MF9vrcYy; _s_tentry=weibo.com; Apache=3136283746669.5415.1726649678250; ULV=1726649678263:6:4:1:3136283746669.5415.1726649678250:1726296280478; SCF=AlXLBiPjXZ_bBVH2QOsVabjZA2-YvdgzlxSY6FAn4Ll-vjxYqtFoxyBrgnR9g7NqS2XAe3VbIFT9RhOiYZzPlR4.; SUB=_2A25L6mf3DeRhGeBP6VoW9SvFzDWIHXVohuU_rDV8PUNbmtANLUvdkW9NRXY2jZGWCKpRNCdwxbWKpnwLN1CGPhGU; ALF=1729471655; SSOLoginState=1726879655; WBPSESS=g82Sj9YE-TKAkLUPlqSBQ-g1hN0DRv66HkoL4QWDRt2UEKWEZ6aJ8YtenUCkg4gHah8uvSm-lv9XxsEZxTkGdtBEzphXm3twt1YI5VTh-Y33op5vVYuwq8VCZi1r8GOWxalnwM7RFml3u7GkFL2O_Q=="
+COOKIE = "UOR=www.google.com,weibo.com,www.google.com; SINAGLOBAL=1501339418390.0996.1715742721445; SUBP=0033WrSXqPxfM725Ws9jqgMF55529P9D9WhOnREGF5-ni5TiSyvnohsR5JpX5KMhUgL.FoqpeonNSK-4S0.2dJLoIEBLxK-L1K2LBKnLxKqL1-eL1-qLxKnL12BLBKeLxKnL1h5L1h5t; ULV=1726649678263:6:4:1:3136283746669.5415.1726649678250:1726296280478; ALF=1729673489; SCF=AlXLBiPjXZ_bBVH2QOsVabjZA2-YvdgzlxSY6FAn4Ll-h4cig6xGxQEJgadx011XWSc56QOxztSUcELCyXRhY40.; SUB=_2A25L9VxADeRhGeBP6VoW9SvFzDWIHXVoi9GIrDV8PUNbmtAbLWHikW9NRXY2jZYQM-oR_Y8nytgWxoL9kWSX44Ad; XSRF-TOKEN=U-Fs4lO3HzDUZwz7XBJxsS3l; WBPSESS=g82Sj9YE-TKAkLUPlqSBQ-g1hN0DRv66HkoL4QWDRt2UEKWEZ6aJ8YtenUCkg4gHUOlQ6gOgDNS50h67uwcEUgM8O9Mvi5JPxud1U53VK2r4bOIfC0G3jEYzlqPcnkEHCrzpNOQrSIIiI5ohhk5v6w=="
 
 HEADERS = {
     "cookie": COOKIE,
@@ -25,6 +27,21 @@ def parse_time(time_str):
     # 解析微博时间字符串
     dt = datetime.strptime(time_str, "%a %b %d %H:%M:%S +0800 %Y")
     return dt
+
+def send_error_message():
+    headers = {"Content-Type": "application/json"}
+    data = {
+        "msgtype": "text",
+        "text": {
+            "content": "cookie失效导致调用失败"
+        }
+    }
+    try:
+        response = requests.post(DEFAULT_WEBHOOK, json=data, headers=headers)
+        return response.status_code == 200
+    except requests.exceptions.RequestException as e:
+        logging.error(f"DingTalk Send Error: {e}")
+        return False
 
 def get_latest_weibo(uid):
     params = {
@@ -40,6 +57,8 @@ def get_latest_weibo(uid):
                 return data["data"]["list"]
     except requests.exceptions.RequestException as e:
         logging.error(f"Request Error: {e}")
+        send_error_message()
+        sys.exit(0)
     except ValueError as e:
         logging.error(f"JSON Decode Error: {e}")
     return None
@@ -116,10 +135,11 @@ def check_and_sync_log():
     db.close()
     logging.info("============== end =================")
 
-
 def main():
     check_and_sync_log()
-    schedule.every(4).hours.do(check_and_sync_log)
+    # 配置每小时执行一次的任务
+    for hour in range(9, 24):  # 从 9 点到 23 点
+        schedule.every().day.at(f"{hour:02d}:00").do(check_and_sync_log)
 
     while True:
         # 检查是否有任务需要执行
